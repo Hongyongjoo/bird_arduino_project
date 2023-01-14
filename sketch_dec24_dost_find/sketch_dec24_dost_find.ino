@@ -1,9 +1,13 @@
 #include <SimpleDHT.h>   // 온습도센서 라이브러리
 #include <LiquidCrystal.h>  // LCD 라이브러리
+#include <SoftwareSerial.h>
 
 #define DHTPIN          7         // DHT핀(온습도센서) - 아두이노 연결핀 번호
 #define DHTTYPE         DHT11     // DHT 타입 정하기 - DHT11
 #define LCD_resolution  6       // LCD 화면 글자선명도 연결핀
+#define BTtx        A1
+#define BTrx        A2
+SoftwareSerial BT(BTtx, BTrx);  
 SimpleDHT11 dht11(DHTPIN);   // DHT 설정 (온습도 센서 설정)
 LiquidCrystal lcd(13, 12, 5, 4, 3, 2);   // LCD 핀 설정
 
@@ -17,6 +21,10 @@ float dust_sensorValue = 0;
 float voltage = 0;
 float dust_density = 0;
 
+int temperature; // 온도
+int humidity; // 습도
+int dust; // 미세먼지
+
 //RGB LED pin
 #define RED     8
 #define GREEN   9
@@ -24,33 +32,38 @@ float dust_density = 0;
 
 void setup() {
   Serial.begin(9600);
+  BT.begin(9600);
   lcd.begin(16,2);  // LCD 사용 설정
-  pinMode(LCD_resolution, OUTPUT);
+  analogWrite(LCD_resolution, 100); // LCD 글자선명도(0~255)
+  lcd.clear(); // LCD화면 지우기
   pinMode(Dust_LED_PIN, OUTPUT); // 먼지센서 LED 출력모드
   pinMode(RED, OUTPUT);
   pinMode(GREEN, OUTPUT);
   pinMode(BLUE, OUTPUT);
-  analogWrite(LCD_resolution, 100); // LCD 글자선명도(0~255)
-  lcd.clear(); // LCD화면 지우기
 }
 
 void loop() {
   dht_check(); // 온습도 체크
   dust_check();  // 미세먼지 체크
   RGB_LED_check(); // RGB LED 체크
+  send_bt(); // 블루투스 데이터 보내기
+}
+
+void send_bt() {
+  BT.print(temperature);
+  BT.print(",");
+  BT.print(humidity);
+  BT.print(",");
+  BT.println(dust);
 }
 
 void RGB_LED_check() { // by PM 2.5
-   // 이곳을 직접 채워 주세요.
+  // if문을 이용해 
+  // dust_density 값에 따라
+  // RGB LED 색깔 정하기
 }
 
-void LED_Color(int r, int g, int b) { // LED색을 바꾸는 부분
-  digitalWrite(RED, r);
-  digitalWrite(GREEN, g);
-  digitalWrite(BLUE, b);  
-}
-
-void dust_check() {  // 미세먼지 센서 처리하는 부분
+void dust_check() {
   digitalWrite(Dust_LED_PIN, LOW); // 적외선 LED ON
   delayMicroseconds(samplingTime); // 280us = 0.28ms
   dust_sensorValue = analogRead(Dust_OUT_PIN); // 먼지센서 출력값 읽기
@@ -63,12 +76,15 @@ void dust_check() {  // 미세먼지 센서 처리하는 부분
   lcd.print("Dust: ");
   lcd.print(dust_density);
   lcd.print(" ug/m3");
+
+  dust = (int)dust_density; // 블루투스 전송 변수에 저장
 }
 
 void dht_check() {
   delay(2000); // 2초 딜레이를 줘야 온습도 센서가 올바로 작동됨  
   byte t = 0;  // 온도 변수
   byte h = 0;  // 습도 변수
+
   dht11.read(&t, &h, NULL); // 온습도 값 저장.
   
   lcd.setCursor(0,0); // LCD 왼쪽위 첫칸
@@ -79,4 +95,8 @@ void dht_check() {
   lcd.print("H:");
   lcd.print(h);  // 습도값 출력
   lcd.print(" %");
+
+
+  temperature = t; // 블루투스 전송 변수에 저장
+  humidity = h; // 블루투스 전송 변수에 저장
 }
